@@ -1,0 +1,73 @@
+Function hierarchy:
+
+hr_arousal_glutamate - process all subjects in glutamate study
+    Called functions:
+    -> associate_events
+    -> eventtime2points
+    -> plot_subject_mean
+
+associate_events - if arousal and clm overlap, mark that arousal as cooccuring with CLM
+eventtime2points - change times to datapoints from start
+    Subfunctions: valid_events & valid_times
+plot_subject_mean - averages heart rate changes across all events
+    Subfunction: plot_beat_beat (where work is done)
+
+
+
+
+
+Here are some useful plotting functions:
+
+plot(1:15,mean(allarousals{strcmp(allarousals.Diagnosis,'RLS') & ...
+    allarousals.withCLM,4:end}),'k-s', ...
+    1:15,mean(allarousals{strcmp(allarousals.Diagnosis,'RLS') & ...
+    ~allarousals.withCLM,4:end}),'k--^', ...
+    1:15,mean(allarousals{strcmp(allarousals.Diagnosis,'Control') & ...
+    allarousals.withCLM,4:end}),'k-o', ...
+    1:15,mean(allarousals{strcmp(allarousals.Diagnosis,'Control') & ...
+    ~allarousals.withCLM,4:end}),'k--d', ...
+    'markerfacecolor','k','markersize',8);
+
+ylim([0.9,1.15])
+f = ylim; g = xlim;
+line([5.5 5.5],[f(1) f(2)],'linestyle',':')
+line([g(1) g(2)],[1 1],'linestyle',':')
+
+legend({'RLS with CLM' 'RLS without CLM' 'Control with CLM' 'Control without CLM'});
+
+plot(1:15,mean(allarousals{strcmp(allarousals.Diagnosis,'RLS') & ...
+    allarousals.withCLM,4:end}),'k-s', ...
+    1:15,mean(allarousals{strcmp(allarousals.Diagnosis,'RLS') & ...
+    ~allarousals.withCLM,4:end}),'k--^', ...
+    'markerfacecolor','k','markersize',8);
+
+ylim([0.9,1.15])
+f = ylim; g = xlim;
+line([5.5 5.5],[f(1) f(2)],'linestyle',':')
+line([g(1) g(2)],[1 1],'linestyle',':')
+legend({'Arousal with CLM' 'Arousal without CLM'});
+
+
+
+# Command sequence to make a new dataset
+wCLM = hr_arousal_glutamate(true);
+woCLM = hr_arousal_glutamate(false);
+
+wCLM.Properties.VariableNames = {'Subject_ID' 'Pre1' 'Pre2' 'Pre3' 'Pre4' 
+    'Pre5' 'Post1' 'Post2' 'Post3' 'Post4' 'Post5' 'Post6' 'Post7' 'Post8' 
+    'Post9' 'Post10'};
+
+woCLM.Properties.VariableNames = {'Subject_ID' 'Pre1' 'Pre2' 'Pre3' 'Pre4' 
+    'Pre5' 'Post1' 'Post2' 'Post3' 'Post4' 'Post5' 'Post6' 'Post7' 'Post8' 
+    'Post9' 'Post10'};
+
+woCLM(67,:) = []; # this guy isn't in wCLM. Maybe index changes though
+
+wCLM.withCLM = repmat(true,136,1);
+woCLM.withCLM = repmat(false,136,1);
+
+allarousals = [wCLM ; woCLM];
+load diagnosis.mat
+allarousals.Subject_ID = cellstr(allarousals.Subject_ID);
+allarousals = innerjoin(allarousals,TEST,'rightkeys','TEST1','leftkeys',...
+    'Subject_ID','rightvariables','TEST2');
