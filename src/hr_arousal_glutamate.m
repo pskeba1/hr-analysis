@@ -8,8 +8,11 @@ function T = hr_arousal_glutamate(withCLM)
 addpath('helper_functions');
 load('names.mat');
 
-f = dir('D:/Glutamate Study/AidRLS*');
-study_base = 'D:/Glutamate Study/';
+%f = dir('D:/Glutamate Study/AidRLS*'); % path to psg
+f = dir('G:/hr-analysis/data/psg/G*');
+% study_base = 'D:/Glutamate Study/';
+study_base = 'G:/hr-analysis/data/psg';
+plm_output_base = 'G:/hr-analysis/data/plm_outputs';
 ids = extractfield(f,'name');
 output_names = [];
 output_points = [];
@@ -20,15 +23,18 @@ arousals_wo_clm = [];
 
 for i = 1:size(hr_arousal_subs,1)
     subj_id = hr_arousal_subs{i};
-    psg_path = find(not(cellfun('isempty',strfind(ids,subj_id))));
-    psg = load([study_base f(psg_path).name '/' subj_id '.mat']);
-    psg = psg.(subj_id); % struct needs to have subj id for now
+    load(fullfile(study_base,subj_id))
+%     psg_path = find(not(cellfun('isempty',strfind(ids,subj_id))));
+%     psg = load([study_base f(psg_path).name '/' subj_id '.mat']);
+%     psg = psg.(subj_id); % struct needs to have subj id for now
     
-    load([study_base f(psg_path).name '/' subj_id '-results.mat'],'plm_outputs');
+%     load([study_base f(psg_path).name '/' subj_id '-results.mat'],'plm_outputs');
+    load(fullfile(plm_output_base,subj_id));
     CLM = plm_outputs.CLM;
 %     CLM(:,1:2) = CLM(:,1:2) + psg.EDFStart2HypnoInSec*500; % adjust times
     
-    ev_vec = eventtime2points(psg,'start_time','hypno_start');
+%     ev_vec = eventtime2points(psg,'start_time','hypno_start');
+    ev_vec = eventtime2points(subj_struct,'start_time','hypno_start');
     ev_vec(:,6) = 0; % doesn't support sleep staging yet
     assoc = associate_events(ev_vec,CLM,.5,.5,500);
     
@@ -41,12 +47,12 @@ for i = 1:size(hr_arousal_subs,1)
     % skip if there's less than 10 movements
 %     if size(ev_vec,1) < 5, continue; end
     
-    hr = load(['../data/hr/' subj_id '.txt']);
+    hr = load(['G:/hr-analysis/data/hr/' subj_id '.txt']);
     % try to adjust start times this way?
-    hr(:,1) = hr(:,1) - psg.EDFStart2HypnoInSec;
+    hr(:,1) = hr(:,1) - subj_struct.EDFStart2HypnoInSec;
     hr = hr(hr(:,1) > 0,:);    
     
-    if ~isempty(psg) && ~isempty(ev_vec)
+    if ~isempty(subj_struct) && ~isempty(ev_vec)
         points = plot_subject_mean(hr,ev_vec,false);
         output_names = [output_names ; subj_id];
         output_points = [output_points ; points];
