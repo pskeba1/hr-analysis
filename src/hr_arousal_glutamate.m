@@ -20,6 +20,7 @@ num_clm = [];
 num_arousals = [];
 arousals_w_clm = [];
 arousals_wo_clm = [];
+errors = [];
 
 for i = 1:size(hr_arousal_subs,1)
     subj_id = hr_arousal_subs{i};
@@ -36,7 +37,7 @@ for i = 1:size(hr_arousal_subs,1)
     %     ev_vec = eventtime2points(psg,'start_time','hypno_start');
         ev_vec = eventtime2points(subj_struct,'start_time','hypno_start');
         ev_vec(:,6) = 0; % doesn't support sleep staging yet
-        assoc = associate_events(ev_vec,CLM,.5,.5,500);
+        assoc = associate_events(ev_vec,CLM,15,15,500);
 
         if withCLM
             ev_vec = ev_vec(assoc,:); % arousal WITH CLM
@@ -65,8 +66,13 @@ for i = 1:size(hr_arousal_subs,1)
             save(['../data/10_beat_centered_hr_arousal/' subj_id],'points');
             clear psg hr ev_vec points subj_id CLM
         end
-    catch
-        disp('Error with subject, continuing.')
+    catch ME
+        if strcmp(ME.identifier,'MATLAB:load:couldNotReadFile')
+            disp('Error with subject, continuing.')
+            display([ME.identifier char(10) ME.message])
+        else
+            rethrow(ME)
+        end
     end
     display(sprintf('Finished %d of %d records',i,size(hr_arousal_subs,1)));
 end
