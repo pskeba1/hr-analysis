@@ -101,6 +101,5 @@ if plt
     datetickzoom('x','HH:MM:SS')
     f = ylim;
     line([plm_time plm_time],[f(1),f(2)])
-    close;
 end
 end
