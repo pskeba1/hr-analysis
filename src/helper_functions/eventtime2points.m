@@ -39,6 +39,8 @@ if strcmpi(p.Results.event_type,'Arousal')
     events = cell2table(this_subj.CISRE_Arousal);
 elseif strcmpi(p.Results.event_type,'Apnea')
     events = cell2table(this_subj.CISRE_Apnea);
+elseif strcmpi(p.Results.event_type,'PLM')
+    events = cell2table(this_subj.CISRE_PLM);
 end
 
 if strcmpi(p.Results.start_time,'edf_start')
@@ -48,13 +50,17 @@ elseif strcmpi(p.Results.start_time,'hypno_start')
 end
 
 % dateTime is expected to only have second precision
-try
-    start_num = datenum(dateTime,'yyyy mm dd HH:MM:SS.fff');
+try 
+    start_num = datevec(dateTime,'yyyy mm ddTHH:MM:SS.fff');
 catch 
-    start_num = datenum(dateTime,'yyyy mm dd HH:MM:SS');
+    start_num = datevec(dateTime,'yyyy mm dd HH:MM:SS');
 end
-ev_vec = round((datenum(events{:,1},tformat)-start_num) * 86500 * 500);
-ev_vec(:,2) = ev_vec(:,1) + round(cell2mat(cellfun(@str2num,events{:,3},'un',0)) * 500);
+ev_datevec = datevec(events{:,1},tformat);
+ev_vec = round((etime(ev_datevec(:,1:6),start_num))*500);
+
+%% Let's just make them all 3 seconds for now...
+% ev_vec(:,2) = ev_vec(:,1) + round(cell2mat(cellfun(@str2num,events{:,3},'un',0)) * 500);
+ev_vec(:,2) = ev_vec(:,1) + 3*500;
 % ev_vec(:,2) = ev_vec(:,1) + round(events{:,3} * 500);
 end
 
@@ -64,6 +70,8 @@ isvalid = 0;
 if strcmpi(evname,'arousal')
     isvalid = 1;
 elseif strcmpi(evname,'apnea')
+    isvalid = 1;
+elseif strcmpi(evname,'PLM')
     isvalid = 1;
 else
     error('Current options are arousal and apnea');
