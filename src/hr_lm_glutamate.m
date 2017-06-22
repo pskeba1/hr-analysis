@@ -1,17 +1,9 @@
-function T = hr_arousal_glutamate(withCLM,lmType)
+function T = hr_lm_glutamate(withAr)
 %% T = hr_arousal_glutamate()
 % This script looks at the heart rate increases before and after arousal
 % events. Right now it runs through the Glutamate study. This is a fine
 % template for other hr analysis scripts, but make sure hr has already been
 % calculated by python or else this will take a ridiculously long time.
-%
-% lmType options: 0 (all lm), 1 (periodic), 2 (nonperiodic)
-%                 3 (lm with arousal - reversed)
-
-if lmType == 3
-    T = hr_lm_glutamate(withCLM);
-    return
-end
 
 addpath('helper_functions');
 load('names.mat'); % subjects that are used in this study
@@ -25,8 +17,8 @@ output_names = [];
 output_points = [];
 num_clm = [];
 num_arousals = [];
-arousals_w_clm = [];
-arousals_wo_clm = [];
+lm_w_arousals = [];
+lm_wo_arousals = [];
 
 for i = 1:size(psgs,1)
     %% Get subject ID
@@ -65,45 +57,21 @@ for i = 1:size(psgs,1)
         CLM(1:end-badi,3) = epochStage(round(CLM(1:end-badi,1)/30/500+.5));
         CLM(end-badi+1:end,3) = CLM(end-badi,3);
         fprintf('Subject %s goes a little past epoch\n',id);
-    end
+    end    
     
+%     CLM = plm_outputs.CLM; % includes wake and sleep for now
     CLM = CLM(CLM(:,3) > 0,1:2);
+%     PLM = plm_outputs.PLM; PLM = PLM(PLM(:,6) > 0,:);
     
-    switch lmType
-        case 0
-            if withCLM
-                savepath = 'D:\Heart Rate Analysis\data\ar_w_lm 21-Jun-2017/';
-                figpath = 'D:\Heart Rate Analysis\figs\ar_w_lm 21-Jun-2017/';
-            else
-                savepath = 'D:\Heart Rate Analysis\data\ar_wo_lm 21-Jun-2017/';
-                figpath = 'D:\Heart Rate Analysis\figs\ar_wo_lm 21-Jun-2017/';
-            end
-        case 1 % only periodic events
-            PLM = plm_outputs.PLM; 
-            PLM = PLM(PLM(:,6) > 0,:);
-            CLM = PLM;
-            if withCLM
-                savepath = 'D:\Heart Rate Analysis\data\ar_w_per 21-Jun-2017/';
-                figpath = 'D:\Heart Rate Analysis\figs\ar_w_per 21-Jun-2017/';
-            else
-                savepath = 'D:\Heart Rate Analysis\data\ar_wo_per 21-Jun-2017/';
-                figpath = 'D:\Heart Rate Analysis\figs\ar_wo_per 21-Jun-2017/';
-            end
-        case 2 % only nonperiodic events
-            PLM = plm_outputs.PLM; 
-            PLM = PLM(PLM(:,6) > 0,:);
-            non_x = setdiff(CLM(:,1),PLM(:,1));
-            CLM = CLM(ismember(CLM(:,1),non_x),:);
-            if withCLM
-                savepath = 'D:\Heart Rate Analysis\data\ar_w_nonper 21-Jun-2017/';
-                figpath = 'D:\Heart Rate Analysis\figs\ar_w_nonper 21-Jun-2017/';
-            else
-                savepath = 'D:\Heart Rate Analysis\data\ar_wo_nonper 21-Jun-2017/';
-                figpath = 'D:\Heart Rate Analysis\figs\ar_wo_nonper 21-Jun-2017/';
-            end            
-    end
-       
-    %% Prepare event vector (arousals)
+    %% Select only the CLM that are nonperiodic
+%     non_x = setdiff(CLM(:,1),PLM(:,1));
+%     CLM = CLM(ismember(CLM(:,1),non_x),:);
+    %% Select only the PLM
+%     CLM = PLM;
+    
+    %% Determine which arousals are associated with CLMs
+%     ev_vec = eventtime2points(subj_struct,'start_time','hypno_start');
+    
     try
         ev_vec(:,3) = epochStage(round(ev_vec(:,1)/30/500+.5));
     catch
@@ -116,22 +84,27 @@ for i = 1:size(psgs,1)
         fprintf('Subject %s goes a little past epoch\n',id);
     end
     ev_vec = ev_vec(ev_vec(:,3) > 0,1:2);
-    assoc = associate_events(ev_vec,CLM,lb,ub,500);
+    assoc = associate_events(CLM,ev_vec,lb,ub,500);
+    ar_vec = ev_vec;
     
     %% Check if we want arousal with or without CLM
-    switch withCLM
+    switch withAr
         case 0
             try
-                ev_vec = ev_vec(~assoc,:);
+                ev_vec = CLM(~assoc,1:2);
             catch
                 ev_vec = [];
             end
+            savepath = 'D:\Heart Rate Analysis\data\lm_wo_ar 21-Jun-2017/';
+            figpath = 'D:\Heart Rate Analysis\figs\lm_wo_ar 21-Jun-2017/';
         case 1
             try
-                ev_vec = ev_vec(assoc,:);
+                ev_vec = CLM(assoc,:);
             catch
                 ev_vec = [];
             end
+            savepath = 'D:\Heart Rate Analysis\data\lm_w_ar 21-Jun-2017/';
+            figpath = 'D:\Heart Rate Analysis\figs\lm_w_ar 21-Jun-2017/';
     end
     
     %% Load heart rate and adjust for time relative to hypnostart
@@ -144,9 +117,9 @@ for i = 1:size(psgs,1)
         output_names = [output_names ; id];
         output_points = [output_points ; points];
         num_clm = [num_clm ; size(CLM,1)];
-        num_arousals = [num_arousals ; size(assoc,1)];
-        arousals_w_clm = [arousals_w_clm ; sum(assoc)];
-        arousals_wo_clm = [arousals_wo_clm ; sum(~assoc)];
+        num_arousals = [num_arousals ; size(ar_vec,1)];
+        lm_w_arousals = [lm_w_arousals ; sum(assoc)];
+        lm_wo_arousals = [lm_wo_arousals ; sum(~assoc)];
         
         savefig([figpath id]); close;
         save([savepath id],'points');
@@ -161,10 +134,10 @@ point_tbl = array2table(output_points,'VariableNames',{'pre1' 'pre2' 'pre3'...
     'post8' 'post9' 'post10'});
 
 T = [table(output_names,'VariableNames',{'Subject_ID'}) point_tbl ...
-    array2table(arousals_w_clm) array2table(arousals_wo_clm) ...
+    array2table(lm_w_arousals) array2table(lm_wo_arousals) ...
     array2table(num_arousals) array2table(num_clm)];
 
-T.withCLM = repmat(withCLM,size(T,1),1);
+T.withCLM = repmat(withAr,size(T,1),1);
 load 'diagnosis.mat';
 T.Subject_ID = cellstr(T.Subject_ID);
 T = innerjoin(T,TEST,'rightkeys','Subject_ID','leftkeys',...
@@ -204,3 +177,57 @@ while i < size(CLM,1)
 end
 
 end
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% for i = 1:size(hr_arousal_subs,1)
+%     subj_id = hr_arousal_subs{i};
+%     load(fullfile(study_base,subj_id))
+% %     psg_path = find(not(cellfun('isempty',strfind(ids,subj_id))));
+% %     psg = load([study_base f(psg_path).name '/' subj_id '.mat']);
+% %     psg = psg.(subj_id); % struct needs to have subj id for now
+%     
+% %     load([study_base f(psg_path).name '/' subj_id '-results.mat'],'plm_outputs');
+%     load(fullfile(plm_output_base,subj_id));
+%     CLM = plm_outputs.CLM;
+% %     CLM(:,1:2) = CLM(:,1:2) + psg.EDFStart2HypnoInSec*500; % adjust times
+%     
+% %     ev_vec = eventtime2points(psg,'start_time','hypno_start');
+%     ev_vec = eventtime2points(subj_struct,'start_time','hypno_start');
+%     ev_vec(:,6) = 0; % doesn't support sleep staging yet
+%     assoc = associate_events(ev_vec,CLM,.5,.5,500);
+%     
+%     if withCLM
+%         ev_vec = ev_vec(assoc,:); % arousal WITH CLM
+%     else
+%         ev_vec = ev_vec(~assoc,:); % arousal WITHOUT CLM
+%     end
+%     
+%     % skip if there's less than 10 movements
+% %     if size(ev_vec,1) < 5, continue; end
+%     
+%     hr = load(['G:/hr-analysis/data/hr/' subj_id '.txt']);
+%     % try to adjust start times this way?
+%     hr(:,1) = hr(:,1) - subj_struct.EDFStart2HypnoInSec;
+%     hr = hr(hr(:,1) > 0,:);    
+%     
+%     if ~isempty(subj_struct) && ~isempty(ev_vec)
+%         points = plot_subject_mean(hr,ev_vec,false);
+%         output_names = [output_names ; subj_id];
+%         output_points = [output_points ; points];
+%         num_clm = [num_clm ; size(CLM,1)];
+%         num_arousals = [num_arousals ; size(assoc,1)];
+%         arousals_w_clm = [arousals_w_clm ; sum(assoc)];
+%         arousals_wo_clm = [arousals_wo_clm ; sum(~assoc)];
+%         
+% %         savefig(['../figs/' subj_id]); close;
+% %         save(['../data/10_beat_centered_hr_arousal/' subj_id],'points');
+%         clear psg hr ev_vec points subj_id CLM
+%     end
+%     display(sprintf('Finished %d of %d records',i,size(hr_arousal_subs,1)));
+% end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -26,8 +26,8 @@ line([5.5 5.5],[f(1) f(2)],'color','r')
 title('Mean HR elevation above mean')
 ylabel('Percent of pre-PLMS mean HR')
 
-display(['Max peak after PLM is ' num2str(max(points(1,11:end)) * 100) ...
-        '% of the pre-PLM mean']);
+% display(['Max peak after PLM is ' num2str(max(points(1,11:end)) * 100) ...
+%         '% of the pre-PLM mean']);
 
 end
 
