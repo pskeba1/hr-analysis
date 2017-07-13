@@ -20,7 +20,7 @@ end
 
 for j = 1:size(arousal,1)
     if any(ev_vec(arousal(j,1):arousal(j,2)) == 1) 
-        assoc(j) = 1; 
+        assoc(j) = 1;
     end
 end
 

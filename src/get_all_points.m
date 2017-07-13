@@ -1,4 +1,4 @@
-function T = hr_arousal_glutamate(withCLM,lmType)
+function T = get_all_points(withCLM,lmType)
 %% T = hr_arousal_glutamate()
 % This script looks at the heart rate increases before and after arousal
 % events. Right now it runs through the Glutamate study. This is a fine
@@ -21,14 +21,10 @@ psgs = rdir('D:\Glutamate Study\**\edf_event.mat'); % path to psg
 %% Just do it here...
 lb = 0.5; ub = 0.5;
 
-output_names = [];
-output_points = [];
-num_clm = [];
-num_arousals = [];
-arousals_w_clm = [];
-arousals_wo_clm = [];
+all_points = [];
+all_ids = [];
 
-for i = 51:size(psgs,1)
+for i = 1:size(psgs,1)
     %% Get subject ID
     id = split(psgs(i).folder,'\'); % hopefully slash is consistent
     id = char(id(end)); % part with subject id
@@ -140,37 +136,15 @@ for i = 51:size(psgs,1)
     hr = hr(hr(:,1) > 0,:);
     
     if ~isempty(ev_vec)%~isempty(subj_struct) && ~isempty(ev_vec)
-        points = plot_subject_mean(hr,ev_vec,true);
-        output_names = [output_names ; id];
-        output_points = [output_points ; points];
-        num_clm = [num_clm ; size(CLM,1)];
-        num_arousals = [num_arousals ; size(assoc,1)];
-        arousals_w_clm = [arousals_w_clm ; sum(assoc)];
-        arousals_wo_clm = [arousals_wo_clm ; sum(~assoc)];
-        
-        close
-%         savefig([figpath id]); close;
-%         save([savepath id],'points');
-        clear psg hr ev_vec points subj_id CLM
+        points = get_all_stuff(hr,ev_vec);
+        all_points = [all_points ; points];
+        all_ids = [all_ids ; repmat(id,size(points,1),1)];
     end
-    fprintf('Finished %d of %d records\n',i,size(psgs,1));
+    fprintf('Finished %d of %d records\n',i,size(psgs,1));    
 end
 
-%% Assemble output table
-point_tbl = array2table(output_points,'VariableNames',{'pre1' 'pre2' 'pre3'...
-    'pre4' 'pre5' 'post1' 'post2' 'post3' 'post4' 'post5' 'post6' 'post7'...
-    'post8' 'post9' 'post10'});
-
-T = [table(output_names,'VariableNames',{'Subject_ID'}) point_tbl ...
-    array2table(arousals_w_clm) array2table(arousals_wo_clm) ...
-    array2table(num_arousals) array2table(num_clm)];
-
-T.withCLM = repmat(withCLM,size(T,1),1);
-load 'diagnosis.mat';
-T.Subject_ID = cellstr(T.Subject_ID);
-T = innerjoin(T,TEST,'rightkeys','Subject_ID','leftkeys',...
-    'Subject_ID','rightvariables','Diagnosis');
-T.maxpost = max(T{:,7:16},[],2);
+T = table(all_ids,all_points(:,1:5),all_points(:,6:15),'VariableNames',...
+    {'Subject_ID','pre','post'});
 
 end % end function (hard to keep track here)
 
@@ -204,4 +178,97 @@ while i < size(CLM,1)
     end
 end
 
+end
+
+function points = get_all_stuff(hr,PLM)
+%% points = plot_subject_mean(hr,PLM)
+% This will create an array, points, with the means for each point. Note
+% that PLM may be any time of event array, so long as it has start and stop
+% times.
+
+points = [];
+imi = []; dur = [];
+
+for i = 1:size(PLM,1)
+    y = plot_beat_beat(hr,PLM,i,0);
+    if size(y,2) < 2, continue; end
+    points = [points ; y(:,2)']; % want in relation to mean
+end
+
+% points = mean(points,1);
+
+end
+
+function y = plot_beat_beat(hr,PLM,i,plt)
+%%
+% Heartrate should not be adjusted in this case, except to convert to
+% data points from seconds
+%
+% Remember to add time to PLM start and stop to reflect the beginning
+% of the record taking place before the occurence of hypnogram scoring
+
+% instead of time, try 10 beats before onset and 20 beats after
+
+fs = 500;
+prenum = 5; postnum = 10;
+hr(:,1) = round(hr(:,1) * fs);
+
+point = knnsearch(hr(:,1),PLM(i,1));
+if hr(point,1) >= PLM(i,1), point = point - 1; end % make sure we have preceding
+
+if point-10 < 1 || point+11 > size(hr,1)
+    y = [];
+    return;
+end
+
+prepoints = hr(point-prenum:point-1,:); postpoints = hr(point+1:point+postnum,:);
+y = [prepoints(:,2) ; postpoints(:,2)];
+y(:,2) = y(:,1)./mean(y(1:prenum,1)); % percent of pre-PLM mean
+% y(:,2) = y(:,1) - mean(y(1:prenum,1)); % percent of pre-PLM mean
+
+
+if plt
+    switch PLM(i,6)
+        case 0 % yellowish
+            c = [1,0.843137254901961,0];
+        case 1 % orangish
+            c = [0.929411764705882,0.694117647058824,0.125490196078431];
+        case 2 % darkish blue
+            c = [0,0.4,0.6];
+        case 3 % darker blue
+            c = [0.313725490196078,0.313725490196078,0.313725490196078];
+        case 5 % pretty much black
+            c = [0.6,0,0];
+    end
+    
+    % time vector for plotting
+    t = ([prepoints(:,1) ; postpoints(:,1)])/86400/500;
+    
+    %y = (smooth(hr_vec(PLM(i,1)-fw:PLM(i,2)+bw,1),800));
+    
+    
+    
+    display(['Max peak after PLM is ' num2str(max(y(11:end,2)) * 100) ...
+        '% of the pre-PLM mean']);
+    
+    plm_time = PLM(i,1)/86400/500;
+    
+    figure
+    subplot(2,1,1);
+    area(t,y(:,2),'facecolor',c)
+    title(['PLM during stage ' num2str(PLM(i,6))])
+    ylabel('Percent of pre-PLM mean HR')
+    ylim([0.7,1.5])
+    datetickzoom('x','HH:MM:SS')
+    f = ylim;
+    line([plm_time plm_time],[f(1),f(2)])
+    
+    subplot(2,1,2);
+    area(t,y(:,1),'facecolor',c)
+    ylabel('Smoothed HR')
+    datetickzoom('x','HH:MM:SS')
+    f = ylim;
+    line([plm_time plm_time],[f(1),f(2)])
+    close;
+end
 end
